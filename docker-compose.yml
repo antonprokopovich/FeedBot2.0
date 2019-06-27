@@ -1,0 +1,69 @@
+version: '3'
+
+services:
+  bot:
+    build: .
+    restart: always
+    env_file: .env
+    environment:
+      - PYTHONPATH=/app/src:$PYTHONPATH
+    #command: python ./src/bot.py
+    entrypoint: .deploy/bot.sh
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+    links:
+      - db:postgres.local
+
+  db:
+    image: "postgres:latest"
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: fbPostgres1337
+      POSTGRES_DB: postgres
+    volumes:
+       # Persist the data between container invocations
+       - .deploy/postgres/out/data:/var/lib/postgresql/data
+       - .deploy/postgres/out/logs:/logs
+       - .deploy/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  pgadmin4:
+    image: dpage/pgadmin4
+    ports:
+      - 8080:80
+    environment:
+      PGADMIN_DEFAULT_EMAIL: nicrontir@yandex.ru
+      PGADMIN_DEFAULT_PASSWORD: FeedBot1337
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_ERLANG_COOKIE: SWQOKODSQALRPCLNMEQG
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - 15672:15672
+      - 5672:5672
+    #volumes:
+    #  - ./enabled_plugins:/etc/rabbitmq/enabled_plugins
+
+  grabber:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    restart: always
+    env_file: .env
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - rabbitmq
+    links:
+      - db:postgresql_db
+    ports:
+      - 8081
